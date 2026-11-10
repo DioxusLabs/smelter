@@ -166,6 +166,14 @@ pub enum VideoDeviceInitError {
     #[error("The chosen adapter is not suitable for a video device")]
     NotSuitableAdapter,
 
+    #[error(
+        "The wgpu device was not created with video support. Create it with VideoAdapterExt::request_device_with_video_support"
+    )]
+    DeviceNotCreatedWithVideoSupport,
+
+    #[error("The system has no hardware video decoder or encoder")]
+    NoHardwareVideoSupport,
+
     #[error("Device error: {0}")]
     BackendError(VideoBackendError),
 }

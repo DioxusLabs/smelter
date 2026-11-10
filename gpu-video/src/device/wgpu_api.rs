@@ -1,16 +1,35 @@
 use std::sync::Arc;
 
 use crate::{
-    EncodedOutputChunk, OutputFrame, VideoDecoderError, VideoEncoderError, VideoTexture,
+    EncodedOutputChunk, OutputFrame, VideoDecoderError, VideoDeviceInitError, VideoEncoderError,
+    VideoTexture,
     backends::{WgpuBackend, backend_from_wgpu},
     device::{DecoderParameters, EncoderParametersH264, EncoderParametersH265},
     global_registry::{GlobalRegistry, RegistryError},
 };
 
 /// Extension that exposes the video capabilities of a device.
-/// The device must have been created using [`VideoAdapterExt::request_device_with_video_support`](`crate::VideoAdapterExt::request_device_with_video_support`), otherwise [`VideoDeviceExt::video`] will return a registry error.
+/// The device must have been created using [`VideoAdapterExt::request_device_with_video_support`](`crate::VideoAdapterExt::request_device_with_video_support`)
+/// or registered with [`VideoDeviceExt::register_video_support`], otherwise [`VideoDeviceExt::video`] will return a registry error.
 pub trait VideoDeviceExt {
     fn video(&self) -> Result<crate::VideoDevice, RegistryError>;
+
+    /// Enables video operations on a device that was created by someone else, for example
+    /// by a renderer that owns device creation.
+    ///
+    /// Returns the same [`VideoDevice`](crate::VideoDevice) as [`VideoDeviceExt::video`] if the
+    /// device was created with [`VideoAdapterExt::request_device_with_video_support`](`crate::VideoAdapterExt::request_device_with_video_support`).
+    /// Otherwise:
+    /// - **VideoToolbox (Metal):** registers the device if the system has a hardware decoder or
+    ///   encoder, else returns [`VideoDeviceInitError::NoHardwareVideoSupport`]. A device is
+    ///   registered when only encoding is available, so check
+    ///   [`VideoDevice::decode_capabilities`](crate::VideoDevice::decode_capabilities) before decoding.
+    /// - **Vulkan:** returns [`VideoDeviceInitError::DeviceNotCreatedWithVideoSupport`]. Vulkan Video needs
+    ///   queues and extensions that can only be enabled when the device is created, so the device
+    ///   has to come from [`VideoAdapterExt::request_device_with_video_support`](`crate::VideoAdapterExt::request_device_with_video_support`).
+    ///
+    /// Devices on other wgpu backends return [`VideoDeviceInitError::NotSuitableAdapter`].
+    fn register_video_support(&self) -> Result<crate::VideoDevice, VideoDeviceInitError>;
 }
 
 impl VideoDeviceExt for wgpu::Device {
@@ -19,6 +38,21 @@ impl VideoDeviceExt for wgpu::Device {
             backend_from_wgpu(self.adapter_info().backend).ok_or(RegistryError::DeviceNotFound)?;
         let device_key = backend.device_key_from_wgpu_device(self);
         let video_device = GlobalRegistry::get_device(&device_key)?;
+
+        Ok(crate::VideoDevice {
+            inner: video_device,
+            wgpu_device: Some(self.clone()),
+        })
+    }
+
+    fn register_video_support(&self) -> Result<crate::VideoDevice, VideoDeviceInitError> {
+        if let Ok(video_device) = self.video() {
+            return Ok(video_device);
+        }
+
+        let backend = backend_from_wgpu(self.adapter_info().backend)
+            .ok_or(VideoDeviceInitError::NotSuitableAdapter)?;
+        let video_device = backend.register_existing_device(self)?;
 
         Ok(crate::VideoDevice {
             inner: video_device,

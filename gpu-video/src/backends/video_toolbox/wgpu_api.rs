@@ -68,22 +68,49 @@ impl WgpuBackend for VTBackend {
         wgpu_adapter: &wgpu::Adapter,
         desc: &crate::parameters::VideoDeviceDescriptor,
     ) -> Result<(wgpu::Device, wgpu::Queue), crate::VideoDeviceInitError> {
-        let (device, queue) =
-            pollster::block_on(wgpu_adapter.request_device(&wgpu::DeviceDescriptor {
-                label: Some("wgpu device created by the videotoolbox decoder"),
+        let (device, queue) = pollster::block_on(
+            wgpu_adapter.request_device(&wgpu::DeviceDescriptor {
+                label: Some(
+                    desc.wgpu_label
+                        .as_deref()
+                        .unwrap_or("wgpu device created by the videotoolbox decoder"),
+                ),
                 required_features: desc.wgpu_features,
                 required_limits: desc.wgpu_limits.clone(),
                 experimental_features: desc.wgpu_experimental_features,
+                memory_hints: desc.wgpu_memory_hints.clone(),
                 ..Default::default()
-            }))
-            .map_err(crate::WgpuInitError::WgpuRequestDeviceError)
-            .map_err(VTInitError::from)?;
+            }),
+        )
+        .map_err(crate::WgpuInitError::WgpuRequestDeviceError)
+        .map_err(VTInitError::from)?;
 
         let id = VTBackend.device_key_from_wgpu_device(&device);
         // VTDevice is empty, and MTLDevices actually only get destroyed at process exit.
         // Because of this, we never remove from the registry.
         GlobalRegistry::register_device(id, Arc::new(VTDevice {}));
         Ok((device, queue))
+    }
+
+    fn register_existing_device(
+        &self,
+        device: &wgpu::Device,
+    ) -> Result<Arc<dyn crate::device::VideoDeviceBackend>, crate::VideoDeviceInitError> {
+        // VideoToolbox needs nothing from the device at creation time, so any Metal device
+        // works as long as the system has a hardware decoder or encoder.
+        let decode_capabilities = caps::query_decode_capabilities();
+        let encode_capabilities = caps::query_encode_capabilities();
+        let supports_video = decode_capabilities.h264.is_some()
+            || encode_capabilities.h264.is_some()
+            || encode_capabilities.h265.is_some();
+        if !supports_video {
+            return Err(crate::VideoDeviceInitError::NoHardwareVideoSupport);
+        }
+
+        let id = self.device_key_from_wgpu_device(device);
+        let video_device = Arc::new(VTDevice {});
+        GlobalRegistry::register_device(id, video_device.clone());
+        Ok(video_device)
     }
 }
 

@@ -35,6 +35,13 @@ pub(crate) trait WgpuBackend: CoreBackend {
         wgpu_adapter: &wgpu::Adapter,
         desc: &crate::parameters::VideoDeviceDescriptor,
     ) -> Result<(wgpu::Device, wgpu::Queue), crate::VideoDeviceInitError>;
+
+    /// Registers a device that was not created by [`WgpuBackend::create_and_register_device`],
+    /// or returns an error if the device can't be used for video operations.
+    fn register_existing_device(
+        &self,
+        device: &wgpu::Device,
+    ) -> Result<Arc<dyn crate::device::VideoDeviceBackend>, crate::VideoDeviceInitError>;
 }
 
 pub(crate) fn default_backend() -> impl CoreBackend {

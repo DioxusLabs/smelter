@@ -92,6 +92,8 @@ impl VulkanDevice {
             wgpu_features,
             wgpu_experimental_features,
             wgpu_limits,
+            wgpu_memory_hints,
+            wgpu_label,
         } = desc;
 
         let transcoder_features = match cfg!(feature = "transcoder") {
@@ -138,7 +140,7 @@ impl VulkanDevice {
                     &required_extensions,
                     wgpu_features,
                     &wgpu_limits,
-                    &wgpu::MemoryHints::default(),
+                    &wgpu_memory_hints,
                     wgpu_queue_family_index,
                     0,
                 )
@@ -150,8 +152,12 @@ impl VulkanDevice {
                 .create_device_from_hal(
                     wgpu_device,
                     &wgpu::DeviceDescriptor {
-                        label: Some("wgpu device created by the vulkan video decoder"),
-                        memory_hints: wgpu::MemoryHints::default(),
+                        label: Some(
+                            wgpu_label
+                                .as_deref()
+                                .unwrap_or("wgpu device created by the vulkan video decoder"),
+                        ),
+                        memory_hints: wgpu_memory_hints.clone(),
                         required_limits: wgpu_limits,
                         required_features: wgpu_features,
                         trace: wgpu::Trace::Off,

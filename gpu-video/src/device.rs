@@ -26,6 +26,27 @@ pub struct VideoDeviceDescriptor {
 
     #[cfg(feature = "wgpu")]
     pub wgpu_limits: wgpu::Limits,
+
+    #[cfg(feature = "wgpu")]
+    pub wgpu_memory_hints: wgpu::MemoryHints,
+
+    /// Debug label of the created [`wgpu::Device`]. If [`None`], gpu-video sets its own label.
+    #[cfg(feature = "wgpu")]
+    pub wgpu_label: Option<String>,
+}
+
+/// Requests the same features, limits, memory hints and label as the wgpu descriptor.
+#[cfg(feature = "wgpu")]
+impl From<&wgpu::DeviceDescriptor<'_>> for VideoDeviceDescriptor {
+    fn from(desc: &wgpu::DeviceDescriptor<'_>) -> Self {
+        Self {
+            wgpu_features: desc.required_features,
+            wgpu_experimental_features: desc.experimental_features,
+            wgpu_limits: desc.required_limits.clone(),
+            wgpu_memory_hints: desc.memory_hints.clone(),
+            wgpu_label: desc.label.map(str::to_owned),
+        }
+    }
 }
 
 /// A fraction

@@ -79,6 +79,15 @@ impl super::WgpuBackend for VulkanBackend {
         })
         .ok_or(crate::VideoDeviceInitError::NotSuitableAdapter)?
     }
+
+    fn register_existing_device(
+        &self,
+        _device: &wgpu::Device,
+    ) -> Result<Arc<dyn crate::device::VideoDeviceBackend>, crate::VideoDeviceInitError> {
+        // The video queues and extensions have to be enabled when the `VkDevice` is created,
+        // so only devices created by `create_and_register_device` support video.
+        Err(crate::VideoDeviceInitError::DeviceNotCreatedWithVideoSupport)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

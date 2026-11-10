@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### ✨ New features
+- Added `VideoDeviceExt::register_video_support` for enabling video on a `wgpu::Device` created outside gpu-video. On macOS it accepts any Metal device when hardware coding is available (otherwise `VideoDeviceInitError::NoHardwareVideoSupport`). On Vulkan the device must still come from `request_device_with_video_support`, otherwise it returns `VideoDeviceInitError::DeviceNotCreatedWithVideoSupport`.
+- Added `wgpu_memory_hints` and `wgpu_label` to `VideoDeviceDescriptor`, and `From<&wgpu::DeviceDescriptor>` for it.
+
 ## [v0.5.0](https://github.com/software-mansion/smelter/releases/tag/gpu-video%2Fv0.5.0)
 
 ### ‼️ Major changes
